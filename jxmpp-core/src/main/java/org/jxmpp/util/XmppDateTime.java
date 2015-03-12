@@ -52,10 +52,12 @@ public class XmppDateTime {
 			.compile("^\\d+(-\\d+){2}+T(\\d+:){2}\\d+(Z|([+-](\\d+:\\d+)))?$");
 
 	private static final DateFormat xep0091Formatter = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss");
+	private static final DateFormat xep0091ZendoFormatter = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss.SSSSSS");
 	private static final DateFormat xep0091Date6DigitFormatter = new SimpleDateFormat("yyyyMd'T'HH:mm:ss");
 	private static final DateFormat xep0091Date7Digit1MonthFormatter = new SimpleDateFormat("yyyyMdd'T'HH:mm:ss");
 	private static final DateFormat xep0091Date7Digit2MonthFormatter = new SimpleDateFormat("yyyyMMd'T'HH:mm:ss");
 	private static final Pattern xep0091Pattern = Pattern.compile("^\\d+T\\d+:\\d+:\\d+$");
+	private static final Pattern xep0091ZendoPattern = Pattern.compile("^\\d+T\\d+:\\d+:\\d+\\.\\d+$");
 
 	public static enum DateFormatType {
 		// @formatter:off
@@ -120,6 +122,7 @@ public class XmppDateTime {
 		TimeZone utc = TimeZone.getTimeZone("UTC");
 
 		xep0091Formatter.setTimeZone(utc);
+		xep0091ZendoFormatter.setTimeZone(utc);
 		xep0091Date6DigitFormatter.setTimeZone(utc);
 		xep0091Date7Digit1MonthFormatter.setTimeZone(utc);
 		xep0091Date7Digit1MonthFormatter.setLenient(false);
@@ -200,6 +203,29 @@ public class XmppDateTime {
 				}
 			}
 		}
+		
+		//now special check for legacy delay date for mangoose server
+		Matcher zendoMatcher = xep0091ZendoPattern.matcher(dateString);
+
+		/*
+		 * if date is in XEP-0091 format handle ambiguous dates missing the
+		 * leading zero in month and day
+		 */
+		if (zendoMatcher.matches()) {
+			int length = dateString.split("T")[0].length();
+
+			if (length < 8) {
+				Date date = handleDateWithMissingLeadingZeros(dateString, length);
+
+				if (date != null)
+					return date;
+			} else {
+				synchronized (xep0091ZendoFormatter) {
+					return xep0091ZendoFormatter.parse(dateString);
+				}
+			}
+		}
+		
 		// Assume XEP-82 date if Matcher does not match
 		return parseXEP0082Date(dateString);
 	}
